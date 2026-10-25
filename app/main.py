@@ -44,6 +44,11 @@ try:
     db.init(DATA_DIR / "idrf.db")
 except PermissionError:
     sys.exit(f"IDRF Reader cannot write to {DATA_DIR}. Check that this user can write to that folder, or set DATA_DIR in .env.")
+with db.connect() as _c:
+    for _r in _c.execute("SELECT id, folder FROM cases WHERE source='blob'").fetchall():
+        _new = blob_source.legacy_folder(_r["folder"])
+        if _new and not _c.execute("SELECT 1 FROM cases WHERE folder=?", (_new,)).fetchone():
+            _c.execute("UPDATE cases SET folder=? WHERE id=?", (_new, _r["id"]))
 importer = Importer(DATA_DIR)
 
 
@@ -439,21 +444,27 @@ def delete_case(cid: int, u=Depends(need_admin)):
 
 
 # ------------------------------------------------------------------ cloud storage
-def _cloud_studies():
+_cloud_cache = {"at": 0.0, "studies": []}
+
+
+def _cloud_studies(refresh=False):
     if not blob_source.enabled():
-        raise HTTPException(400, "Cloud storage is not set up. Set AZURE_STORAGE_CONNECTION_STRING and restart.")
+        raise HTTPException(400, "Cloud storage is not set up. Set AZURE_STORAGE_CONNECTION_STRING and AZURE_STORAGE_SOURCES, then restart.")
+    if not refresh and time.time() - _cloud_cache["at"] < 300:
+        return _cloud_cache["studies"]
     try:
-        return blob_source.list_studies()
+        _cloud_cache.update(studies=blob_source.list_studies(), at=time.time())
+        return _cloud_cache["studies"]
     except Exception as e:
         log.exception("cloud storage listing failed")
         raise HTTPException(502, f"Could not read cloud storage: {str(e).splitlines()[0][:300]}")
 
 
 @app.get("/api/admin/cloud")
-def cloud_list(u=Depends(need_admin)):
+def cloud_list(refresh: bool = False, u=Depends(need_admin)):
     if not blob_source.enabled():
         return {"enabled": False, "studies": []}
-    return {"enabled": True, "where": blob_source.where(), "studies": _cloud_studies()}
+    return {"enabled": True, "where": blob_source.where(), "studies": _cloud_studies(refresh)}
 
 
 class CloudAdd(BaseModel):

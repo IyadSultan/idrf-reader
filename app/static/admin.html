@@ -57,14 +57,15 @@ form.add input,form.add select{min-width:150px}
     <h2>Cloud storage</h2>
     <p class="lead">Studies in <b id="cloudWhere"></b>. Tick the scans to be read and add them. Each becomes a blinded case and is prepared in the background; only the prepared images are kept on the server. The patient is filled in from the patient folder; set the timepoint in the case list below.</p>
     <div class="row cloud-tools">
-      <input type="search" id="cloudQ" placeholder="Filter, e.g. abdomen or a patient number" aria-label="Filter studies">
+      <select id="cloudSrc" aria-label="Storage source"><option value="">All sources</option></select>
+      <input type="search" id="cloudQ" placeholder="Filter, e.g. venous child or a patient number" aria-label="Filter studies">
       <label><input type="checkbox" id="cloudHide" checked> Hide studies already added</label>
       <button class="btn primary" id="cloudAdd" disabled>Add selected</button>
       <button class="btn" id="cloudReload">Refresh list</button>
       <span class="scan" id="cloudTxt">Loading studies…</span>
     </div>
     <div class="tbl cloud"><table>
-      <thead><tr><th><input type="checkbox" id="cloudAll" aria-label="Select all studies shown"></th><th>Patient</th><th>Date</th><th>Study</th><th>Case</th></tr></thead>
+      <thead><tr><th><input type="checkbox" id="cloudAll" aria-label="Select all matching studies"></th><th>Source</th><th>Patient</th><th>Date</th><th>Study</th><th>Case</th></tr></thead>
       <tbody id="cloudRows"></tbody></table></div>
   </section>
 
@@ -194,43 +195,49 @@ async function load() {
 // ---------------------------------------------------------------- cloud storage
 let C = null;
 const picked = new Set();
+const CLOUD_ROWS = 400;
 const studyLabel = s => { const m = /^(\d{4})(\d{2})(\d{2})_?(.*)$/.exec(s); return m ? [`${m[1]}-${m[2]}-${m[3]}`, m[4].replace(/_+/g, ' ').trim()] : ['', s.replace(/_+/g, ' ')]; };
-async function loadCloud() {
+async function loadCloud(refresh) {
   $('#cloudTxt').textContent = 'Loading studies…';
   try {
-    C = await api('/api/admin/cloud');
+    C = await api('/api/admin/cloud' + (refresh === true ? '?refresh=1' : ''));
     if (!C.enabled) { $('#cloudSec').hidden = true; return; }
     $('#cloudSec').hidden = false;
-    $('#cloudWhere').textContent = C.where;
+    $('#cloudWhere').textContent = C.where.join(' and ');
+    const src = $('#cloudSrc'), cur = src.value;
+    src.innerHTML = '<option value="">All sources</option>' + C.where.map(w => `<option value="${esc(w)}">${esc(w)}</option>`).join('');
+    src.value = C.where.includes(cur) ? cur : '';
+    src.hidden = C.where.length < 2;
     renderCloud();
   } catch (e) { $('#cloudSec').hidden = false; $('#cloudTxt').textContent = e.message; }
 }
 function shownStudies() {
-  const q = $('#cloudQ').value.trim().toLowerCase(), hide = $('#cloudHide').checked;
+  const terms = $('#cloudQ').value.toLowerCase().split(/\s+/).filter(Boolean), hide = $('#cloudHide').checked, src = $('#cloudSrc').value;
   const have = new Map((D ? D.cases : []).filter(c => c.source === 'blob').map(c => [c.folder, c]));
   return C.studies.map(s => Object.assign({}, s, { c: have.get(s.path) }))
-    .filter(s => !(hide && s.c) && (!q || s.path.toLowerCase().replace(/_/g, ' ').includes(q)));
+    .filter(s => !(hide && s.c) && (!src || s.source === src) && terms.every(t => s.path.toLowerCase().replace(/_/g, ' ').includes(t)));
 }
 function renderCloud() {
   if (!C || !C.enabled) return;
   const rows = shownStudies();
   for (const s of rows) if (s.c) picked.delete(s.path);
-  $('#cloudRows').innerHTML = rows.length ? rows.map(s => {
+  $('#cloudRows').innerHTML = rows.length ? rows.slice(0, CLOUD_ROWS).map(s => {
     const [date, desc] = studyLabel(s.study);
     return `<tr class="${s.c ? 'added' : ''}">
       <td>${s.c ? '' : `<input type="checkbox" data-p="${esc(s.path)}" ${picked.has(s.path) ? 'checked' : ''} aria-label="Select ${esc(desc)}">`}</td>
-      <td>${esc(s.patient)}</td><td>${esc(date)}</td><td class="wrapc">${esc(desc)}</td>
+      <td>${esc(s.source.split('/')[0])}</td><td>${esc(s.patient)}</td><td>${esc(date)}</td><td class="wrapc">${esc(desc)}</td>
       <td>${s.c ? `<b>${esc(s.c.code)}</b> <span class="st ${s.c.status}">${STATUS[s.c.status] || esc(s.c.status)}</span>` : ''}</td></tr>`;
-  }).join('') : `<tr><td colspan="5" class="empty">No studies match.</td></tr>`;
+  }).join('') : `<tr><td colspan="6" class="empty">No studies match.</td></tr>`;
   const free = rows.filter(s => !s.c);
   $('#cloudAll').checked = free.length > 0 && free.every(s => picked.has(s.path));
   $('#cloudAdd').disabled = !picked.size;
   $('#cloudAdd').textContent = picked.size ? `Add ${picked.size} selected` : 'Add selected';
-  $('#cloudTxt').textContent = `${rows.length} of ${C.studies.length} studies shown`;
+  $('#cloudTxt').textContent = `${rows.length} of ${C.studies.length} studies match` + (rows.length > CLOUD_ROWS ? `; the first ${CLOUD_ROWS} are listed, narrow the filter to see others` : '');
 }
 $('#cloudQ').addEventListener('input', renderCloud);
 $('#cloudHide').addEventListener('change', renderCloud);
-$('#cloudReload').addEventListener('click', loadCloud);
+$('#cloudSrc').addEventListener('change', renderCloud);
+$('#cloudReload').addEventListener('click', () => loadCloud(true));
 $('#cloudRows').addEventListener('change', e => { const p = e.target.dataset.p; if (!p) return; e.target.checked ? picked.add(p) : picked.delete(p); renderCloud(); });
 $('#cloudAll').addEventListener('change', e => { for (const s of shownStudies()) if (!s.c) e.target.checked ? picked.add(s.path) : picked.delete(s.path); renderCloud(); });
 $('#cloudAdd').addEventListener('click', async () => {

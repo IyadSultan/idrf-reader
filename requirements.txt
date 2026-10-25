@@ -4,3 +4,5 @@ pydicom>=3.0,<4
 numpy>=1.26,<3
 python-gdcm>=3.0.22
 azure-storage-blob>=12.19,<13
+pylibjpeg>=2.0,<3
+pylibjpeg-libjpeg>=2.1,<3

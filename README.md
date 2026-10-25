@@ -161,7 +161,7 @@ Use a Linux Python 3.12 web app on the Basic (B1) plan or higher, with a single 
    | `SQLITE_JOURNAL_MODE` | `DELETE` |
    | `COOKIE_SECURE` | `1` |
    | `SCM_DO_BUILD_DURING_DEPLOYMENT` | `true` |
-   | `AZURE_STORAGE_CONNECTION_STRING`, `AZURE_STORAGE_CONTAINER`, `AZURE_STORAGE_PREFIX` | optional, see [Images from Azure Blob Storage](#images-from-azure-blob-storage) |
+   | `AZURE_STORAGE_CONNECTION_STRING`, `AZURE_STORAGE_SOURCES` | optional, see [Images from Azure Blob Storage](#images-from-azure-blob-storage) |
 
 3. Deploy from GitHub through **Deployment Center**.
 4. Add studies from Azure Blob Storage (below), or upload de-identified DICOM folders to `/home/data/dicom/`, for example as a zip through the Kudu API, which extracts it in place:
@@ -176,12 +176,13 @@ An App Service app is reachable from the internet by default. Limit it under **N
 
 ## Images from Azure Blob Storage
 
-Studies can come straight from a blob container laid out as `<prefix>/<patient>/<study>/<series>/<DICOM files>`. Set `AZURE_STORAGE_CONNECTION_STRING`, `AZURE_STORAGE_CONTAINER` and `AZURE_STORAGE_PREFIX`; a **Cloud storage** list then appears in the coordinator page.
+Studies can come straight from one or more blob containers in a storage account, laid out as `<container>/<prefix>/<patient>/<study>/<series>/<DICOM files>`. Set `AZURE_STORAGE_CONNECTION_STRING`, and list the containers with their prefixes in `AZURE_STORAGE_SOURCES`, for example `cnsimaging/cnsimaging, nb2015/nb2015`. A **Cloud storage** list then appears in the coordinator page, with a source picker and a filter: several words must all match, for example `venous child`.
 
 - Tick the studies to be read and choose **Add selected**. Each becomes a blinded case, with the patient filled in from the patient folder. Set the timepoint in the case list.
 - Each study is downloaded to a temporary folder only while it is prepared; only the prepared volume is kept in `DATA_DIR/cache`. Scanning again re-prepares a study only if its files changed.
 - A cloud case no reader has started can be removed with **Remove**, and added again later.
-- A read-only SAS (permissions: read and list on the container) is safer than the account key.
+- A read-only SAS (permissions: read and list) is safer than the account key.
+- The study list is cached for five minutes; **Refresh list** reads it again.
 
 ## Settings
 
@@ -198,8 +199,7 @@ All settings live in `.env` (copy from `.env.example`). Real environment variabl
 | `PREFERRED_THICKNESS` | `2.5` | Slice thickness in mm preferred when a study has several contrast series |
 | `COOKIE_SECURE` | `0` | Set to `1` when served over HTTPS |
 | `AZURE_STORAGE_CONNECTION_STRING` | empty | Connection string of the blob storage holding DICOM studies; empty turns the cloud list off |
-| `AZURE_STORAGE_CONTAINER` | empty | Blob container with the studies |
-| `AZURE_STORAGE_PREFIX` | empty | Folder inside the container where the patient folders start |
+| `AZURE_STORAGE_SOURCES` | empty | Comma-separated `container/prefix` pairs where the patient folders start, e.g. `cnsimaging/cnsimaging, nb2015/nb2015`. A single `AZURE_STORAGE_CONTAINER` with `AZURE_STORAGE_PREFIX` also works |
 | `SQLITE_JOURNAL_MODE` | `WAL` | Set to `DELETE` when `DATA_DIR` is on a network share, such as Azure App Service |
 
 ## Backups
@@ -265,4 +265,4 @@ run.bat / run.sh     one-click start on Windows / Linux and macOS
 
 ## Licences of included components
 
-Atkinson Hyperlegible font: SIL Open Font License (Braille Institute of America). Dependencies: FastAPI (MIT), Uvicorn (BSD), pydicom (MIT), NumPy (BSD), GDCM (BSD), Azure Storage Blob SDK (MIT). No licence is set for the application code itself; choose one before making the repository public.
+Atkinson Hyperlegible font: SIL Open Font License (Braille Institute of America). Dependencies: FastAPI (MIT), Uvicorn (BSD), pydicom (MIT), NumPy (BSD), GDCM (BSD), Azure Storage Blob SDK (MIT), pylibjpeg and pylibjpeg-libjpeg (MIT and GPLv3 respectively). No licence is set for the application code itself; choose one before making the repository public.
