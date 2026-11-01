@@ -29,6 +29,7 @@ TIMEPOINTS = {
     "diagnosis": "diagnosis", "baseline": "diagnosis", "dx": "diagnosis", "pre": "diagnosis",
     "post_induction": "post_induction", "post": "post_induction", "post_chemo": "post_induction",
     "after": "post_induction", "preop": "post_induction", "pre_op": "post_induction",
+    "presurgery": "post_induction", "pre_surgery": "post_induction",
 }
 PREFERRED_THICKNESS = float(os.environ.get("PREFERRED_THICKNESS", "2.5"))
 

@@ -25,7 +25,7 @@ from pydantic import BaseModel
 from . import blob_source
 from . import config
 from . import db
-from .dicom_import import Importer, new_code
+from .dicom_import import TIMEPOINTS, Importer, new_code
 from .idrf import GROUPS, ITEM_IDS, SHORT, VALID
 
 log = logging.getLogger("idrf")
@@ -483,8 +483,9 @@ def cloud_add(body: CloudAdd, u=Depends(need_admin)):
                 continue
             code = new_code(codes)
             codes.add(code)
-            c.execute("INSERT INTO cases(code, folder, patient, status, source) VALUES(?, ?, ?, 'pending', 'blob')",
-                      (code, path, s["patient"][:64]))
+            tp = TIMEPOINTS.get(re.sub(r"^\d+_", "", s["study"].lower()))  # e.g. 1_diagnosis, 2_presurgery
+            c.execute("INSERT INTO cases(code, folder, patient, timepoint, status, source) VALUES(?, ?, ?, ?, 'pending', 'blob')",
+                      (code, path, s["patient"][:64], tp))
             added += 1
     audit("admin", "cloud_add", f"{added} studies")
     if added:
