@@ -45,6 +45,10 @@ main{display:grid;grid-template-columns:minmax(0,1fr) 410px;min-height:0}
 details.def{margin-top:8px;font-size:12.5px;color:var(--muted)}
 details.def summary{cursor:pointer;color:var(--text)}
 details.def p{margin:6px 0 0;max-width:62ch}
+details.def table{margin-top:6px;border-collapse:collapse;max-width:62ch}
+details.def th,details.def td{text-align:left;vertical-align:top;padding:3px 8px 3px 0;border-bottom:1px solid var(--line)}
+details.def th{color:var(--text)}
+.item-h{display:block;margin-top:2px;font-size:12px;color:var(--muted)}
 .panel-b{overflow:auto}
 .grp{border-top:1px solid var(--line)}
 .grp:first-child{border-top:0}
@@ -126,8 +130,17 @@ textarea{width:100%;resize:vertical;min-height:54px}
         <h2>Image-defined risk factors</h2>
         <div class="tally"><span id="answered">0 of 20 answered</span><span class="p" id="presentN">0 present</span><span id="draft"></span></div>
         <details class="def">
-          <summary>How encasement is defined</summary>
-          <p>Encasement means the tumour is in contact with more than 50% of the vessel circumference. A flattened vein with no visible lumen also counts. Contact with less than 50% of the circumference is not an IDRF (INRG imaging consensus, Brisse et al., Radiology 2011).</p>
+          <summary>Definitions: contact is not encasement</summary>
+          <table>
+            <tr><th>Term</th><th>Definition (INRG)</th><th>IDRF?</th></tr>
+            <tr><td>Separation</td><td>Fat plane visible between tumour and vessel</td><td>No</td></tr>
+            <tr><td>Contact</td><td>Artery: tumour contact &lt; 50% of the circumference. Vein: flattened but lumen still visible</td><td>No</td></tr>
+            <tr><td>Encasement</td><td>Artery: tumour contact &gt; 50% of the circumference. Vein: flattened with lumen no longer visible</td><td>Yes</td></tr>
+            <tr><td>Compression</td><td>Trachea or bronchus: short-axis diameter reduced by tumour</td><td>Yes</td></tr>
+            <tr><td>Infiltration</td><td>Organ: interface with tumour irregular or ill-defined</td><td>Yes (listed sites)</td></tr>
+          </table>
+          <p>Not IDRFs, and they do not change the L1/L2 call: multifocal primary tumours; pleural effusion or ascites, with or without malignant cells. Record them in Notes.</p>
+          <p>Brisse et al., Radiology 2011.</p>
         </details>
       </div>
       <div class="panel-b" id="list"></div>
@@ -327,7 +340,7 @@ function buildChecklist() {
         <button class="linkbtn" data-na="${g.id}" title="Mark every item in this region N/A">Region not imaged</button></div>
       ${g.items.map(it => `
         <div class="item" data-id="${it.id}">
-          <div class="item-t" id="t-${it.id}">${it.t}</div>
+          <div class="item-t" id="t-${it.id}">${it.t}${it.h ? `<span class="item-h">${it.h}</span>` : ''}</div>
           <div class="seg ans" role="group" aria-labelledby="t-${it.id}"><button data-v="absent" aria-pressed="false">Absent</button><button data-v="present" aria-pressed="false">Present</button><button data-v="na" aria-pressed="false">N/A</button></div>
         </div>`).join('')}
     </section>`).join('') + `
@@ -354,7 +367,7 @@ function syncChecklist() {
     const v = r.answers[el.dataset.id]; el.dataset.state = v || '';
     for (const b of el.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.v === v));
   }
-  for (const g of GROUPS) document.querySelector(`[data-g="${g.id}"] .grp-n`).textContent = `${g.items.filter(it => r.answers[it.id]).length}/${g.items.length}`;
+  for (const g of GROUPS) document.querySelector(`[data-g="${g.id}"] .grp-n`).textContent = `${g.items.filter(it => r.answers[it.id]).length} of ${g.items.length} answered`;
   for (const b of $('#conf').children) b.setAttribute('aria-pressed', String(+b.dataset.c === r.confidence));
   const ta = $('#notes'); if (document.activeElement !== ta) ta.value = r.notes || '';
   $('#answered').textContent = `${ans} of ${ITEMS.length} answered`;
